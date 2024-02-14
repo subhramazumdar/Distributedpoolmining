@@ -28,6 +28,8 @@ int count_white(int vid,igraph_t *g,int *visited)
 		//	#pragma omp critical (vit3)
 			IGRAPH_VIT_NEXT(vit3);
 		}
+		igraph_vit_destroy(&vit3);
+		igraph_vs_destroy(&vs3);
 		return count;
              
     
@@ -73,10 +75,10 @@ int bfs(int vid, int level, igraph_t *g, int *white,int *visited)
 			
 			IGRAPH_VIT_NEXT(vit3);
 		}
-		//igraph_vit_destroy(&vit3);
-		//igraph_vit_destroy(&vit4);
-		//igraph_vs_destroy(&vs3);
-		//igraph_vs_destroy(&vs4);
+		igraph_vit_destroy(&vit3);
+		igraph_vit_destroy(&vit4);
+		igraph_vs_destroy(&vs3);
+		igraph_vs_destroy(&vs4);
 		if(win==vid && white[vid]>0)
 		{
 		  // white[vid]=0;
@@ -88,8 +90,8 @@ int bfs(int vid, int level, igraph_t *g, int *white,int *visited)
 		   	visited[IGRAPH_VIT_GET(vit5)]=2;
 		   	IGRAPH_VIT_NEXT(vit5);
 		   }
-		  // igraph_vit_destroy(&vit5);
-		//igraph_vs_destroy(&vs5);
+		  igraph_vit_destroy(&vit5);
+		  igraph_vs_destroy(&vs5);
 		
 		 //  printf("vid=%d",vid);
 		   return vid;
@@ -110,16 +112,13 @@ void find_dom(igraph_t *g)
 	    igraph_vs_all(&vs);
 	    int counter=0,vertex,flag=0;
 	    int *visited=(int*)malloc(igraph_vcount(g)*sizeof(int));
-	    int *dom_set=(int*)malloc(igraph_vcount(g)*sizeof(int));
 	    int *white=(int*)malloc(igraph_vcount(g)*sizeof(int));
 	    int *vertex_id=(int*)malloc(igraph_vcount(g)*sizeof(int));
 	    igraph_vit_t vit,vit1,vit2;
 	    //igraph_integer_t mdeg;
 	    //igraph_vector_int_init(&v, igraph_vss_all());
 	    int i,j;
-	    igraph_vit_create(g, vs, &vit);
-	    //igraph_vit_create(g, indices, &vit1);
-	    igraph_degree(g, &v, igraph_vss_all(), IGRAPH_OUT, IGRAPH_NO_LOOPS);
+	    
 	    //igraph_vector_reverse_sort((igraph_vector_t*)&v);
 	    //igraph_degree(g, &mdeg, igraph_vss_all(), IGRAPH_OUT, IGRAPH_NO_LOOPS);
 	   // igraph_vector_int_print(&mdeg);
@@ -127,23 +126,26 @@ void find_dom(igraph_t *g)
 	    for(i=0;i<igraph_vcount(g);i++)
 	    {
 	    	visited[i]=0; 
-	    	white[i]=VECTOR(v)[i];
-	    	dom_set[i]=-1;
+	    	white[i]=count_white(i,g,visited);
+	    	//dom_set[i]=-1;
 	   }
 	   // int count2=0;	
 	    	
 	    while(1)
 	    {
-	    printf("sub");
+	    //printf("sub");
 	    flag=0;
-	     #pragma omp parallel for num_threads(igraph_vcount(g)) shared(visited,white) private(j,counter)
+	     #pragma omp parallel for num_threads(4) shared(visited,white) private(j,counter)
 	     for(j=0;j<igraph_vcount(g);j++)
 	     {
 	         int tid = omp_get_thread_num();
-	         white[j]=count_white(j,g,visited);
 	         if(white[j]>0)
 	         {
-	             flag=1;
+	         	white[j]=count_white(j,g,visited);
+	         	if(white[j]>0)
+	         	{
+	             	flag=1;
+	         	}
 	         }
 	         
 	         //bfs(j,2,g,visited);
@@ -152,23 +154,23 @@ void find_dom(igraph_t *g)
 	     }
 	     if(flag==0)
 	         break;
-	     #pragma omp parallel for num_threads(igraph_vcount(g)) shared(visited,white,dom_set,counter) private(j) 
+	     #pragma omp parallel for num_threads(4) shared(visited,white) private(j) 
 	     for(j=0;j<igraph_vcount(g);j++)
 	     {
 	     
 	       int tid = omp_get_thread_num();
-	      //  printf("ok%d,%d\n",tid,j);
-	       if(visited[j]!=1)
+	       
+	       if(visited[j]!=1 && white[j]>0)
 	       {
 	          // #pragma omp critical (vertex)
 	           vertex=bfs(j,2,g,white,visited);
 	           if(vertex==j)
-	               printf("v:%d,%d\n",vertex,j);
+	             //  printf("v:%d,%d\n",vertex,j);
 	          
-	          #pragma omp critical (vertex)
+	         // #pragma omp critical (vertex)
 	           if(vertex!=-1)
 	           {
-	           printf("v:%d,%d\n",vertex,j);
+	                //printf("v:%d,%d\n",vertex,j);
 	                //dom_set[counter]=vertex;
 	                visited[vertex]=1;
 	                //#pragma omp critical (counter)
@@ -191,8 +193,11 @@ int main(int argc, char *argv[]) {
          srand(time(NULL));         
  	 igraph_integer_t eid,from,to,value,vid,eid1,flow,source,sink,count=0;
  	 igraph_set_attribute_table(&igraph_cattribute_table);
-	 //omp_set_num_threads(100);
+	 //omp_set_num_threads(2000);
+	 //printf("%d\n",omp_get_max_threads());
+	 int start=clock();
  	 FILE *fp=fopen(argv[1],"r"); 
+ 	 //omp_set_num_threads(50000) ;
  	 if(!fp)
  	 {
 	
@@ -201,11 +206,13 @@ int main(int argc, char *argv[]) {
  	 }
 	
  	 igraph_read_graph_edgelist(&g, fp, 0, IGRAPH_DIRECTED);
+ 	 
  	 find_dom(&g);
+ 	 int end=clock();
  	 fclose(fp);
 	 //height=(int*)calloc(igraph_vcount(&g),sizeof(int));
  	  
-         printf("%s%d","ok",igraph_vcount(&g));
+         printf("time:%fs",((double) (end - start)) / CLOCKS_PER_SEC);
     	 //igraph_destroy(&g);
      	 return 0;
 }
