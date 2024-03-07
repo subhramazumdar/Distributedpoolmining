@@ -75,41 +75,50 @@ int bfs(int vid, int level, igraph_t *g, int *white,int *visited)
 		 igraph_vit_create(g, vs3, &vit3);
 		 int count=white[vid];
 		 int win=vid;
-		 while (!IGRAPH_VIT_END(vit3) && count>0) {
+		 int flag=0;
+		 while (!IGRAPH_VIT_END(vit3) && count>0 && flag==0) {
 		 
 		
 		     
 			if(visited[IGRAPH_VIT_GET(vit3)]!=1 && white[IGRAPH_VIT_GET(vit3)]>count)
 			{
-			     	win=IGRAPH_VIT_GET(vit3);
-			     	count=white[IGRAPH_VIT_GET(vit3)];
+			     	//win=IGRAPH_VIT_GET(vit3);
+			     	//count=white[IGRAPH_VIT_GET(vit3)];
+			     	flag=1;
 			     	//printf("win=%d,%d,%d\n",win,vid,count);
+			     	break;
 			     	
 			}
+		        if(flag==0)
+		        {	
 			igraph_vs_adj(&vs4,IGRAPH_VIT_GET(vit3),IGRAPH_OUT);
 		 	igraph_vit_create(g, vs4, &vit4);
 		 	while (!IGRAPH_VIT_END(vit4)) {
 		 	
 		 	   if(visited[IGRAPH_VIT_GET(vit4)]!=1 && white[IGRAPH_VIT_GET(vit4)]>count)
 			   {
-			     	win=IGRAPH_VIT_GET(vit4);
-			     	count=white[IGRAPH_VIT_GET(vit4)];
+			     	//win=IGRAPH_VIT_GET(vit4);
+			     	//count=white[IGRAPH_VIT_GET(vit4)];
+			     	flag=1;
+			     	break;
 			     	//printf("win1=%d\n",win);
 			     	
 			   }	
 		 	   IGRAPH_VIT_NEXT(vit4);
 		 	
 		 	}
+		 	igraph_vit_destroy(&vit4);
+			igraph_vs_destroy(&vs4);
+		 	}
 			
 			IGRAPH_VIT_NEXT(vit3);
-			igraph_vit_destroy(&vit4);
-			igraph_vs_destroy(&vs4);
+			
 		}
 		igraph_vit_destroy(&vit3);
 
 		igraph_vs_destroy(&vs3);
 
-		if(win==vid && white[vid]>0)
+		if(flag==0 && white[vid]>0)
 		{
 		  // white[vid]=0;
 		   visited[vid]=1;
